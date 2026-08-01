@@ -204,6 +204,13 @@ class VideoPlayService : BaseService() {
         }
         isNew = intent.getBooleanExtra("isNew", true)
         if (isNew) {
+            // 停止上一次的播放并释放媒体，防止旧视频继续播放
+            VideoPlay.stopLoading()
+            VideoPlay.stopPlayback()
+            // 重置可能残留的上一次播放状态，防止旧链接/标题泄漏到新会话
+            VideoPlay.singleUrl = false
+            VideoPlay.videoUrl = null
+            VideoPlay.videoTitle = null
             intent.getStringExtra("videoUrl")?.let {
                 VideoPlay.videoUrl = it
                 VideoPlay.singleUrl = true

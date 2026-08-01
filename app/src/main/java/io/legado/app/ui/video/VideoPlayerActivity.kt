@@ -46,11 +46,16 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.gsyVideo.VideoPlayer
 import io.legado.app.help.webView.PooledWebView
 import io.legado.app.help.webView.WebJsExtensions
-import io.legado.app.help.webView.WebJsExtensions.Companion.getInjectionString
+import io.legado.app.help.webView.WebJsExtensions.Companion.buildUseWebInjection
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameCache
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameJava
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameSource
+import io.legado.app.help.webView.WebJsExtensions.Companion.wrapUseWebHtml
 import io.legado.app.help.webView.WebViewPool
+import io.legado.app.help.webView.WebViewPool.fitInlineContent
+import io.legado.app.help.webView.WebViewPool.installInlineContentRefitOnTouch
+import io.legado.app.help.webView.WebViewPool.prepareForInlineContent
+import io.legado.app.help.webView.WebViewPool.scheduleInlineContentFit
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryTextColor
@@ -85,7 +90,11 @@ import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.toggleSystemBar
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.visible
+import io.legado.app.help.InnerBrowserLinkResolver
+import androidx.compose.ui.platform.ComposeView
+import io.legado.app.ui.theme.LegadoTheme
 import io.noties.markwon.Markwon
+import io.noties.markwon.MarkwonConfiguration
 import io.noties.markwon.ext.tables.TablePlugin
 import io.noties.markwon.html.HtmlPlugin
 import io.noties.markwon.image.glide.GlideImagesPlugin
@@ -134,6 +143,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         })
     }
     private var isNew = true
+    private var isStartingNew = false
     private var isFullScreen = false
     private var orientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     private var menuCustomBtn: MenuItem? = null
@@ -178,25 +188,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         playerView.enlargeImageRes = R.drawable.ic_fullscreen
         isNew = intent.getBooleanExtra("isNew", true)
         if (isNew) {
-            intent.getStringExtra("videoUrl")?.let {
-                VideoPlay.videoUrl = it
-                VideoPlay.singleUrl = true
-            }
-            intent.getStringExtra("videoTitle")?.let {
-                binding.titleBar.title = it
-                VideoPlay.videoTitle = it
-            }
-            val sourceKey = intent.getStringExtra("sourceKey")
-            val sourceType = intent.getIntExtra("sourceType", 0)
-            val bookUrl = intent.getStringExtra("bookUrl")
-            val record = intent.getStringExtra("record")
-            VideoPlay.inBookshelf = intent.getBooleanExtra("inBookshelf", true)
-            if (!VideoPlay.initSource(sourceKey, sourceType, bookUrl, record)) {
-                finish()
-                return
-            }
-            VideoPlay.startPlay(playerView)
-            VideoPlay.saveRead()
+            startNewSession()
         } else {
             VideoPlay.clonePlayState(playerView)
             playerView.setSurfaceToPlay()
@@ -205,6 +197,10 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         }
         setupPlayerView()
         initView()
+        // 静音播放视频toast提示
+        if (VideoPlay.mutePlay) {
+            toastOnUi(R.string.mute_play_enabled)
+        }
         upView()
         onBackPressedDispatcher.addCallback(this) {
             if (isFullScreen) {
@@ -215,6 +211,58 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         }
     }
 
+    /**
+     * 处理 singleTask 复用 Activity 时收到的新 Intent。
+     * 当从发现列表/书籍详情页切换书籍时，旧 Activity 会被复用，
+     * 新的 bookUrl 通过 onNewIntent 传入，需要重新初始化播放。
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        // 如果在全屏模式，先退出全屏
+        if (isFullScreen) {
+            toggleFullScreen()
+        }
+        startNewSession()
+        initView()
+        upView()
+    }
+
+    /**
+     * 初始化新的播放会话：停止旧播放、重置状态、加载新书源数据、开始播放。
+     * 被 onActivityCreated(isNew=true) 和 onNewIntent() 共同调用。
+     */
+    private fun startNewSession() {
+        // 标记新会话启动，跳过 onResume 恢复旧视频
+        isStartingNew = true
+        // 停止上一次的播放并释放媒体，防止 onResume 时旧视频被恢复
+        VideoPlay.stopLoading()
+        VideoPlay.stopPlayback()
+        // 重置可能残留的上一次播放状态，防止旧链接/标题泄漏到新会话
+        VideoPlay.singleUrl = false
+        VideoPlay.videoUrl = null
+        VideoPlay.videoTitle = null
+        intent.getStringExtra("videoUrl")?.let {
+            VideoPlay.videoUrl = it
+            VideoPlay.singleUrl = true
+        }
+        intent.getStringExtra("videoTitle")?.let {
+            binding.titleBar.title = it
+            VideoPlay.videoTitle = it
+        }
+        val sourceKey = intent.getStringExtra("sourceKey")
+        val sourceType = intent.getIntExtra("sourceType", 0)
+        val bookUrl = intent.getStringExtra("bookUrl")
+        val record = intent.getStringExtra("record")
+        VideoPlay.inBookshelf = intent.getBooleanExtra("inBookshelf", true)
+        if (!VideoPlay.initSource(sourceKey, sourceType, bookUrl, record)) {
+            finish()
+            return
+        }
+        VideoPlay.startPlay(playerView)
+        VideoPlay.saveRead()
+    }
+
     private fun initView() {
         viewModel.upStarMenuData.observe(this) { upStarMenu() }
         binding.root.setBackgroundColor(backgroundColor)
@@ -222,9 +270,11 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         if (book == null) {
             binding.data.invisible()
             binding.chaptersContainer.invisible()
+            binding.quickJumpButtons.gone()
             return
         }
         showBook(book)
+        setupQuickJumpButtons()
         if (VideoPlay.episodes.isNullOrEmpty()) {
             binding.chapters.gone()
         } else {
@@ -239,6 +289,56 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         }
     }
 
+    private fun setupQuickJumpButtons() {
+        binding.quickJumpButtons.setContent {
+            // 直接读取 VideoPlay 的属性值，每次 setContent 时会获取最新值
+            LegadoTheme {
+                QuickJumpButtons(
+                    enabled = VideoPlay.quickJumpButtonsEnabled,
+                    minutesA = VideoPlay.quickJumpMinutesA,
+                    minutesB = VideoPlay.quickJumpMinutesB,
+                    onBackA = { performQuickJump(-VideoPlay.quickJumpMinutesA) },
+                    onBackB = { performQuickJump(-VideoPlay.quickJumpMinutesB) },
+                    onForwardB = { performQuickJump(VideoPlay.quickJumpMinutesB) },
+                    onForwardA = { performQuickJump(VideoPlay.quickJumpMinutesA) }
+                )
+            }
+        }
+    }
+    
+    private fun updateQuickJumpButtonsState() {
+        // 非全屏模式：根据开关状态更新 ComposeView 可见性和内容
+        if (VideoPlay.quickJumpButtonsEnabled && !isFullScreen && VideoPlay.book != null) {
+            binding.quickJumpButtons.visible()
+            binding.quickJumpButtons.setContent {
+                LegadoTheme {
+                    QuickJumpButtons(
+                        enabled = VideoPlay.quickJumpButtonsEnabled,
+                        minutesA = VideoPlay.quickJumpMinutesA,
+                        minutesB = VideoPlay.quickJumpMinutesB,
+                        onBackA = { performQuickJump(-VideoPlay.quickJumpMinutesA) },
+                        onBackB = { performQuickJump(-VideoPlay.quickJumpMinutesB) },
+                        onForwardB = { performQuickJump(VideoPlay.quickJumpMinutesB) },
+                        onForwardA = { performQuickJump(VideoPlay.quickJumpMinutesA) }
+                    )
+                }
+            }
+        } else {
+            binding.quickJumpButtons.gone()
+        }
+
+        // 全屏模式：更新全屏播放器内的快捷跳转按钮
+        playerView.getFullWindowPlayer()?.updateQuickJumpButtons()
+    }
+
+    private fun performQuickJump(minutes: Int) {
+        val currentPosition = playerView.getCurrentPositionWhenPlaying()
+        val duration = playerView.getDuration()
+        val jumpMs = minutes * 60 * 1000L
+        val newPosition = (currentPosition + jumpMs).coerceIn(0, duration)
+        playerView.seekTo(newPosition)
+    }
+
     private fun showBook(book: Book) {
         binding.run {
             showCover(book)
@@ -250,8 +350,10 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         }
     }
 
-    inner class CustomWebViewClient : WebViewClient() {
-        private val jsStr = getInjectionString
+    inner class CustomWebViewClient(
+        private val source: io.legado.app.data.entities.BaseSource?
+    ) : WebViewClient() {
+        private val jsStr = buildUseWebInjection(source)
         override fun shouldOverrideUrlLoading(
             view: WebView?,
             request: WebResourceRequest?
@@ -283,8 +385,10 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         }
         override fun onPageFinished(view: WebView?, url: String?) {
             super.onPageFinished(view, url)
-            view?.post {
-                binding.tvIntroContainer.requestLayout()
+            view?.let {
+                scheduleInlineContentFit(it, afterLayout = {
+                    binding.tvIntroContainer.requestLayout()
+                })
             }
         }
     }
@@ -297,21 +401,29 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 introTextView.text = intro
                 return
             }
-            val html = intro.substring(8, lastIndex)
+            val html = wrapUseWebHtml(intro.substring(8, lastIndex), VideoPlay.source)
             val pooledWebView = this.pooledWebView ?: let{
                 val pooledWebView = WebViewPool.acquire(this)
                 val webView = pooledWebView.realWebView
                 webView.onResume()
-                webView.webViewClient = CustomWebViewClient()
+                prepareForInlineContent(webView)
+                installInlineContentRefitOnTouch(webView) {
+                    binding.tvIntroContainer.requestLayout()
+                }
+                webView.webViewClient = CustomWebViewClient(VideoPlay.source)
                 webView.addJavascriptInterface(WebCacheManager, nameCache)
                 VideoPlay.source?.let {
                     webView.addJavascriptInterface(it, nameSource)
-                    val webJsExtensions = WebJsExtensions(it, null, webView)
+                    val webJsExtensions = WebJsExtensions(it, this, webView)
                     webView.addJavascriptInterface(webJsExtensions, nameJava)
                 }
                 pooledWebView
             }
             val webView = pooledWebView.realWebView
+            prepareForInlineContent(webView)
+            installInlineContentRefitOnTouch(webView) {
+                binding.tvIntroContainer.requestLayout()
+            }
             if (initIntroView || this.pooledWebView == null) {
                 initIntroView = false
                 this.pooledWebView = pooledWebView
@@ -366,6 +478,11 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 val markwon: Markwon
                 val markdown = withContext(IO) {
                     markwon = Markwon.builder(context)
+                        .usePlugin(object : io.noties.markwon.AbstractMarkwonPlugin() {
+                            override fun configureConfiguration(builder: MarkwonConfiguration.Builder) {
+                                builder.linkResolver(InnerBrowserLinkResolver)
+                            }
+                        })
                         .usePlugin(
                             GlideImagesPlugin.create(
                                 Glide.with(context)
@@ -491,6 +608,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             supportActionBar?.hide()
             binding.chaptersContainer.gone()
             binding.data.gone()
+            binding.quickJumpButtons.gone()
             playerView.startWindowFullscreen(this, false, false)
         } else {
             requestedOrientation = orientation
@@ -498,6 +616,9 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             if (VideoPlay.book != null) {
                 binding.chaptersContainer.visible()
                 binding.data.visible()
+                if (VideoPlay.quickJumpButtonsEnabled) {
+                    binding.quickJumpButtons.visible()
+                }
             }
             playerView.postDelayed({
                 playerView.backFromFull(this)
@@ -729,6 +850,12 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             }
         }
 
+        observeEvent<Boolean>(EventBus.VIDEO_CONFIG_CHANGED) {
+            updateQuickJumpButtonsState()
+            // 更新播放器静音状态
+            playerView.setMute(VideoPlay.mutePlay)
+        }
+
     }
 
     override fun finish() {
@@ -781,6 +908,28 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         if (initGetter) {
             glideImageGetter.stop()
         }
+    }
+
+    /**
+     * 暂停时记录视频阅读时长
+     */
+    override fun onPause() {
+        super.onPause()
+        VideoPlay.onPause()
+    }
+
+    /**
+     * 恢复时标记视频阅读开始
+     */
+    override fun onResume() {
+        super.onResume()
+        if (isStartingNew) {
+            // 新会话启动时跳过恢复旧视频，新内容加载完成后由 startPlayLogic 自动播放
+            isStartingNew = false
+            VideoPlay.markReadStart()
+            return
+        }
+        VideoPlay.onResume()
     }
 
     override fun onDestroy() {

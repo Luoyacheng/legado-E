@@ -100,7 +100,8 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         url: String,
         html: String? = null,
         preloadJs: String? = null,
-        config: String? = null
+        config: String? = null,
+        title: String? = null
     ) : this() {
         arguments = Bundle().apply {
             putString("sourceKey", sourceKey)
@@ -109,6 +110,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             putString("html", html)
             putString("preloadJs", preloadJs)
             putString("config", config)
+            putString("title", title)
         }
     }
 
@@ -136,6 +138,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     private var customWebViewCallback: WebChromeClient.CustomViewCallback? = null
     private var originOrientation: Int? = null
     private var needClearHistory = true
+    private var headerMap: Map<String, String> = emptyMap()
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
@@ -392,7 +395,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             var fileName = URLUtil.guessFileName(url, contentDisposition, null)
             fileName = URLDecoder.decode(fileName, "UTF-8")
             currentWebView.longSnackbar(fileName, getString(R.string.action_download)) {
-                Download.start(requireContext(), url, fileName)
+                Download.start(requireContext(), url, fileName, currentWebView.url)
             }
         }
     }
@@ -400,6 +403,10 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         view.setBackgroundColor(0)
+        arguments?.getString("title")?.takeIf { it.isNotBlank() }?.let { title ->
+            binding.tvTitle.text = title
+            binding.tvTitle.visible()
+        }
         binding.webViewContainer.addView(currentWebView)
         lifecycleScope.launch(IO) {
             val args = arguments
@@ -410,6 +417,13 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             val sourceKey = args.getString("sourceKey") ?: return@launch
             val url = args.getString("url") ?: return@launch
             kotlin.runCatching {
+                source = appDb.bookSourceDao.getBookSource(sourceKey)
+                    ?: appDb.rssSourceDao.getByKey(sourceKey)
+                if (source == null) {
+                    activity?.toastOnUi("no find source")
+                    dismiss()
+                    return@launch
+                }
                 args.getString("config")?.let { json ->
                     try {
                         GSON.fromJsonObject<Config>(json).getOrThrow().let { config ->
@@ -437,36 +451,34 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                         }
                     }
                 }
+                preloadJs = args.getString("preloadJs")
                 val analyzeUrl =
                     AnalyzeUrl(url, source = source, coroutineContext = coroutineContext)
-                val html = args.getString("html") ?: analyzeUrl.getStrResponseAwait().body
-                if (html.isNullOrEmpty()) {
-                    throw NoStackTraceException("html is NullOrEmpty")
-                }
-                preloadJs = args.getString("preloadJs")
-                val spliceHtml = if (preloadJs.isNullOrEmpty()) {
-                    html
+                headerMap = analyzeUrl.headerMap
+                val htmlArg = args.getString("html")
+                val spliceHtml = if (htmlArg == null && analyzeUrl.isSimpleGetRequest()) {
+                    null
                 } else {
-                    val headIndex = html.indexOf("<head", ignoreCase = true)
-                    if (headIndex >= 0) {
-                        val closingHeadIndex = html.indexOf('>', startIndex = headIndex)
-                        if (closingHeadIndex >= 0) {
-                            val insertPos = closingHeadIndex + 1
-                            StringBuilder(html).insert(insertPos, JS_URL).toString()
+                    val html = htmlArg ?: analyzeUrl.getStrResponseAwait().body
+                    if (html.isNullOrEmpty()) {
+                        throw NoStackTraceException("html is NullOrEmpty")
+                    }
+                    if (preloadJs.isNullOrEmpty()) {
+                        html
+                    } else {
+                        val headIndex = html.indexOf("<head", ignoreCase = true)
+                        if (headIndex >= 0) {
+                            val closingHeadIndex = html.indexOf('>', startIndex = headIndex)
+                            if (closingHeadIndex >= 0) {
+                                val insertPos = closingHeadIndex + 1
+                                StringBuilder(html).insert(insertPos, JS_URL).toString()
+                            } else {
+                                JS_URL + html
+                            }
                         } else {
                             JS_URL + html
                         }
-                    } else {
-                        JS_URL + html
                     }
-                }
-                appDb.bookSourceDao.getBookSource(sourceKey).let {
-                    if (it == null) {
-                        activity?.toastOnUi("no find bookSource")
-                        dismiss()
-                        return@launch
-                    }
-                    source = it
                 }
                 val bookType = args.getInt("bookType", 0)
                 currentWebView.post {
@@ -538,7 +550,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
 
     private fun initWebView(
         url: String,
-        html: String,
+        html: String?,
         headerMap: HashMap<String, String>,
         bookType: Int
     ) {
@@ -555,7 +567,11 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             currentWebView.addJavascriptInterface(source, nameSource)
             currentWebView.addJavascriptInterface(WebCacheManager, nameCache)
         }
-        currentWebView.loadDataWithBaseURL(url, html, "text/html", "utf-8", url)
+        if (html == null) {
+            currentWebView.loadUrl(url, headerMap)
+        } else {
+            currentWebView.loadDataWithBaseURL(url, html, "text/html", "utf-8", url)
+        }
     }
 
     private fun saveImage(webPic: String) {
@@ -597,6 +613,9 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         return if (URLUtil.isValidUrl(data)) {
             okHttpClient.newCallResponseBody {
                 url(data)
+                headerMap.forEach { (key, value) ->
+                    addHeader(key, value)
+                }
             }.bytes()
         } else {
             Base64.decode(data.split(",").toTypedArray()[1], Base64.DEFAULT)
