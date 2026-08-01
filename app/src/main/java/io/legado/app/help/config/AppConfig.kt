@@ -28,6 +28,8 @@ import java.net.InetAddress
 @Suppress("MemberVisibilityCanBePrivate", "ConstPropertyName")
 object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val isCronet = appCtx.getPrefBoolean(PreferKey.cronet)
+    val isECH: Boolean get() = appCtx.getPrefBoolean(PreferKey.ech)
+    var echDohUrl = appCtx.getPrefString(PreferKey.echDohUrl, "https://1.1.1.1/dns-query")
     var useAntiAlias = appCtx.getPrefBoolean(PreferKey.antiAlias)
     var userAgent: String = getPrefUserAgent()
     var customHosts = appCtx.getPrefString(PreferKey.customHosts)
@@ -126,6 +128,8 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
                     && appCtx.getPrefBoolean(PreferKey.optimizeRender, false)
 
             PreferKey.recordLog -> recordLog = appCtx.getPrefBoolean(PreferKey.recordLog)
+
+            PreferKey.echDohUrl -> echDohUrl = appCtx.getPrefString(PreferKey.echDohUrl, "https://1.1.1.1/dns-query")
 
         }
     }

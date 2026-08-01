@@ -69,6 +69,9 @@ val options by lazy {
 
     options.put("AsyncDNS", JSONObject("{'enable':true}"))
 
+    // ECH 现在通过本地 Go 代理实现 (EchProxyManager)
+    // ECH 开启时不使用 Cronet (CronetInterceptor 会跳过)
+    // 所以这里不再配置 Cronet 的 DoH/ECH
 
     options.toString()
 }
@@ -108,6 +111,8 @@ fun buildRequest(request: Request, callback: UrlRequest.Callback): UrlRequest? {
 }
 
 private fun customHost(url: String): String {
+    // ECH 启用时跳过域名→IP 替换，否则 SNI 会变成 IP，ECH 无法工作
+    if (AppConfig.isECH) return url
     val urlIp = customIp.remove(url)
     if (AppConfig.hostMap.isEmpty() && urlIp == null) return url
     val host = AppPattern.domainRegex.find(url)?.groupValues?.getOrNull(1) ?: return url

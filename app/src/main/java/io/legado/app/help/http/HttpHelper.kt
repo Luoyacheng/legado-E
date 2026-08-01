@@ -6,6 +6,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.glide.progress.ProgressManager.LISTENER
 import io.legado.app.help.glide.progress.ProgressResponseBody
 import io.legado.app.help.http.CookieManager.cookieJarHeader
+import io.legado.app.lib.ech.EchProxyManager
 import io.legado.app.model.ReadManga
 import io.legado.app.utils.NetworkUtils
 import okhttp3.ConnectionSpec
@@ -104,11 +105,23 @@ val okHttpClient: OkHttpClient by lazy {
             cachedAddress ?: Dns.SYSTEM.lookup(hostname)
         }
     }
-    if (AppConfig.isCronet) {
+    if (AppConfig.isCronet && !AppConfig.isECH) {
         if (Cronet.loader?.install() == true) {
             Cronet.interceptor?.let {
                 builder.addInterceptor(it)
             }
+        }
+    }
+    // ECH: 启动本地 Go 代理，OkHttp 通过 HTTP 代理转发请求
+    // 代理内部做 DoH 查询 + ECH TLS 握手，Cronet 不参与（不使用 OkHttp 代理设置）
+    if (AppConfig.isECH) {
+        if (EchProxyManager.start()) {
+            builder.proxy(
+                Proxy(
+                    Proxy.Type.HTTP,
+                    InetSocketAddress(EchProxyManager.proxyHost, EchProxyManager.proxyPort)
+                )
+            )
         }
     }
     builder.addInterceptor(DecompressInterceptor)

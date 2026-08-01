@@ -882,6 +882,7 @@
     <string name="check_source_show_debug_message_summary">書源校驗時顯示網路請求步驟和時間</string>
     <string name="need_login">需登入</string>
     <string name="pref_cronet_summary">使用Cronet網路元件</string>
+    <string name="pref_ech_summary">加密客戶端問候(ECH)，加密SNI防封鎖，需先開啟Cronet</string>
     <string name="anti_alias">抗鋸齒</string>
     <string name="pref_anti_alias_summary">繪製圖片時抗鋸齒</string>
     <string name="upload_url">上傳URL</string>

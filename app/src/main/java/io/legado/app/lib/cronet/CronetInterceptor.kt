@@ -3,6 +3,7 @@ package io.legado.app.lib.cronet
 import android.annotation.SuppressLint
 import android.os.Build
 import androidx.annotation.Keep
+import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.CookieManager
 import io.legado.app.help.http.CookieManager.cookieJarHeader
 import io.legado.app.utils.printOnDebug
@@ -24,6 +25,11 @@ class CronetInterceptor(private val cookieJar: CookieJar) : Interceptor {
             throw IOException("Canceled")
         }
         val original: Request = chain.request()
+        // ECH 开启时跳过 Cronet，使用 OkHttp + 本地 ECH 代理处理
+        // Cronet 不使用 OkHttp 的代理设置，无法走本地 Go 代理
+        if (AppConfig.isECH) {
+            return chain.proceed(original)
+        }
         //Cronet未初始化
         if (!CronetLoader.install() || cronetEngine == null) {
             return chain.proceed(original)

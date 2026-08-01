@@ -67,6 +67,7 @@ class OtherConfigFragment : PreferenceFragment(),
         putPrefBoolean(PreferKey.processText, isProcessTextEnabled())
         addPreferencesFromResource(R.xml.pref_config_other)
         upPreferenceSummary(PreferKey.userAgent, AppConfig.userAgent)
+        upPreferenceSummary(PreferKey.echDohUrl, AppConfig.echDohUrl)
         upPreferenceSummary(PreferKey.preDownloadNum, AppConfig.preDownloadNum.toString())
         upPreferenceSummary(PreferKey.threadCount, AppConfig.threadCount.toString())
         upPreferenceSummary(PreferKey.webPort, AppConfig.webPort.toString())
@@ -97,6 +98,7 @@ class OtherConfigFragment : PreferenceFragment(),
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
         when (preference.key) {
             PreferKey.userAgent -> showUserAgentDialog()
+            PreferKey.echDohUrl -> showEchDohUrlDialog()
             PreferKey.customHosts -> showCustomHostsDialog()
             PreferKey.videoSetting -> showDialogFragment(SettingsDialog(requireActivity()))
             PreferKey.defaultBookTreeUri -> localBookTreeSelect.launch {
@@ -217,6 +219,14 @@ class OtherConfigFragment : PreferenceFragment(),
                 upPreferenceSummary(PreferKey.userAgent, AppConfig.userAgent)
             }
 
+            PreferKey.echDohUrl -> listView.post {
+                upPreferenceSummary(PreferKey.echDohUrl, AppConfig.echDohUrl)
+            }
+
+            PreferKey.ech -> listView.postDelayed(1000) {
+                appCtx.restart()
+            }
+
             PreferKey.checkSource -> listView.post {
                 upPreferenceSummary(PreferKey.checkSource, CheckSource.summary)
             }
@@ -281,6 +291,29 @@ class OtherConfigFragment : PreferenceFragment(),
                 } else {
                     putPrefString(PreferKey.userAgent, userAgent)
                 }
+            }
+            cancelButton()
+        }
+    }
+
+    @SuppressLint("InflateParams")
+    private fun showEchDohUrlDialog() {
+        alert(getString(R.string.pref_ech_doh_title)) {
+            val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
+                editView.hint = "https://your-doh-server/dns-query"
+                editView.setText(AppConfig.echDohUrl)
+            }
+            customView { alertBinding.root }
+            okButton {
+                val dohUrl = alertBinding.editView.text?.toString()
+                if (dohUrl.isNullOrBlank()) {
+                    removePref(PreferKey.echDohUrl)
+                    AppConfig.echDohUrl = "https://1.1.1.1/dns-query"
+                } else {
+                    putPrefString(PreferKey.echDohUrl, dohUrl)
+                    AppConfig.echDohUrl = dohUrl
+                }
+                upPreferenceSummary(PreferKey.echDohUrl, AppConfig.echDohUrl)
             }
             cancelButton()
         }

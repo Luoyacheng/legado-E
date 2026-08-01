@@ -99,6 +99,8 @@ object PreferKey {
     const val syncBookProgress = "syncBookProgress"
     const val syncBookProgressPlus = "syncBookProgressPlus"
     const val cronet = "Cronet"
+    const val ech = "ECH"
+    const val echDohUrl = "echDohUrl"
     const val antiAlias = "antiAlias"
     const val bitmapCacheSize = "bitmapCacheSize"
     const val imageRetainNum = "imageRetainNum"

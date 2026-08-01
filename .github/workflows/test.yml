@@ -253,8 +253,10 @@ jobs:
 
   prerelease:
     needs: [ prepare, build ]
-    if: github.event_name != 'pull_request' && github.repository == 'Luoyacheng/legado-E'
+    if: github.event_name != 'pull_request' && (github.repository == 'Luoyacheng/legado-E' || github.repository == 'anglesgirl/legado-E')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
     steps:
@@ -302,6 +304,7 @@ jobs:
 
       - name: Create or update beta tag
         if: needs.prepare.outputs.updateLog_updated != 'yes'
+        continue-on-error: true
         uses: richardsimko/update-tag@v1
         with:
           tag_name: beta

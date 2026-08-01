@@ -892,6 +892,9 @@
     <string name="check_source_show_debug_message_summary">书源校验时显示网络请求步骤和时间</string>
     <string name="need_login">需要登录</string>
     <string name="pref_cronet_summary">使用 Cronet 网络组件</string>
+    <string name="pref_ech_summary">加密客户端问候(ECH)，通过本地代理加密SNI防封锁（切换需重启）</string>
+    <string name="pref_ech_doh_title">ECH DoH 地址</string>
+    <string name="pref_ech_doh_summary">用于ECH的DoH服务器地址，国内建议换成可访问的</string>
     <string name="anti_alias">抗锯齿</string>
     <string name="pref_anti_alias_summary">绘制图片时抗锯齿</string>
     <string name="upload_url">上传 URL</string>

@@ -112,6 +112,17 @@
 
         <io.legado.app.lib.prefs.SwitchPreference
             android:defaultValue="false"
+            android:key="ECH"
+            android:summary="@string/pref_ech_summary"
+            android:title="ECH" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:key="echDohUrl"
+            android:summary="@string/pref_ech_doh_summary"
+            android:title="@string/pref_ech_doh_title" />
+
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
             android:key="antiAlias"
             android:summary="@string/pref_anti_alias_summary"
             android:title="@string/anti_alias" />

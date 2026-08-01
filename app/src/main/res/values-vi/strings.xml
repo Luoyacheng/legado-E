@@ -886,6 +886,7 @@
     <string name="check_source_show_debug_message_summary">Hiển thị trạng thái mạng và dấu thời gian trong quá trình kiểm tra nguồn</string>
     <string name="need_login">cần đăng nhập</string>
     <string name="pref_cronet_summary">Sử dụng thành phần mạng Cronet</string>
+    <string name="pref_ech_summary">Encrypted Client Hello, mã hóa SNI để vượt qua kiểm duyệt (yêu cầu Cronet)</string>
     <string name="anti_alias">Chống răng cưa</string>
     <string name="pref_anti_alias_summary">Chống răng cưa khi vẽ ảnh</string>
     <string name="upload_url">tải lên url</string>
