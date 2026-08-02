@@ -302,7 +302,7 @@ jobs:
 
       - name: Create or update beta tag
         if: needs.prepare.outputs.updateLog_updated != 'yes'
-        uses: richardsimko/update-tag@v1
+        uses: richardsimko/update-tag@v2
         with:
           tag_name: beta
         env:
