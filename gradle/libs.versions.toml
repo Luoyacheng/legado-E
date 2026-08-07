@@ -13,7 +13,7 @@ documentfile = "1.1.0"
 
 libarchive = "1.1.6"
 lyricViewx = "1.3.2"
-soraEditor = "0.24.4"
+soraEditor = "0.24.5"
 glide = "5.0.5"
 gson = "2.13.2"
 jsonPath = "2.10.0"
