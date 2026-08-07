@@ -378,7 +378,7 @@ jobs:
           echo "TAGS=$tags" >> $GITHUB_OUTPUT
       - name: Post to channel
         continue-on-error: true
-        uses: xireiki/channel-post@v1
+        uses: xireiki/channel-post@v2
         with:
           chat_id: ${{ secrets.CHANNEL_ID }}
           bot_token: ${{ secrets.BOT_TOKEN }}
