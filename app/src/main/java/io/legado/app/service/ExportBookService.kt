@@ -25,6 +25,7 @@ import io.legado.app.help.book.isLocalModified
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.LocalBook
+import io.legado.app.model.localBook.PdfToEpub
 import io.legado.app.ui.book.cache.CacheActivity
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.FileUtils
@@ -180,24 +181,30 @@ class ExportBookService : BaseService() {
                 val book = appDb.bookDao.getBook(bookUrl)
                 try {
                     book ?: throw NoStackTraceException("获取${bookUrl}书籍出错")
-                    refreshChapterList(book)
                     notificationContentText = getString(
                         R.string.export_book_notification_content,
                         book.name,
                         waitExportBooks.size
                     )
                     upExportNotification()
-                    if (exportConfig.type == "epub") {
-                        if (exportConfig.epubScope.isNullOrBlank()) {
-                            exportEpub(exportConfig.path, book)
-                        } else {
-                            CustomExporter(
-                                exportConfig.epubScope,
-                                exportConfig.epubSize
-                            ).export(exportConfig.path, book)
+                    when (exportConfig.type) {
+                        "pdf2epub" -> exportPdfToEpub(exportConfig.path, book)
+                        "epub" -> {
+                            refreshChapterList(book)
+                            if (exportConfig.epubScope.isNullOrBlank()) {
+                                exportEpub(exportConfig.path, book)
+                            } else {
+                                CustomExporter(
+                                    exportConfig.epubScope,
+                                    exportConfig.epubSize
+                                ).export(exportConfig.path, book)
+                            }
                         }
-                    } else {
-                        exportTxt(exportConfig.path, book)
+
+                        else -> {
+                            refreshChapterList(book)
+                            exportTxt(exportConfig.path, book)
+                        }
                     }
                     exportMsg[book.bookUrl] = getString(R.string.export_success)
                 } catch (e: Throwable) {
@@ -336,6 +343,25 @@ class ExportBookService : BaseService() {
             return Pair("\n\n$content1", srcList)
         } else {
             return Pair("\n\n$content1", null)
+        }
+    }
+
+    /**
+     * PDF 转 EPUB（文本版），复用导出框架，转换完成后自动导入书架
+     */
+    private suspend fun exportPdfToEpub(path: String, book: Book) {
+        exportMsg.remove(book.bookUrl)
+        postEvent(EventBus.EXPORT_BOOK, book.bookUrl)
+        val fileDoc = FileDoc.fromDir(path)
+        val epubDoc = PdfToEpub.convert(book, fileDoc) { current, _ ->
+            exportProgress[book.bookUrl] = current
+            postEvent(EventBus.EXPORT_BOOK, book.bookUrl)
+        }
+        // 转换完成后导入到书架
+        runCatching {
+            LocalBook.importFile(epubDoc.uri)
+        }.onFailure {
+            AppLog.put("导入转换后的EPUB失败\n${it.localizedMessage}", it)
         }
     }
 

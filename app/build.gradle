@@ -275,6 +275,9 @@ dependencies {
     //压缩解压
     implementation libs.libarchive
 
+    //PDF文本提取, 用于PDF转EPUB(仅提取文本, 不替换现有PdfRenderer图片渲染)
+    implementation libs.pdfbox.android
+
     //apache
     implementation(libs.commons.text)
 

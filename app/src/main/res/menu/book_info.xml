@@ -26,6 +26,11 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_pdf_to_epub"
+        android:title="@string/pdf_to_epub"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_refresh"
         android:title="@string/refresh"
         app:showAsAction="never" />

@@ -28,6 +28,8 @@ nanoHttpd = "2.3.1"
 okhttp = "5.3.2"
 preference = "1.2.1"
 quickChineseTransfer = "0.2.17"
+# PDF文本提取(PDF转EPUB), 与pdfbox-android对齐, 仅用于提取文本不渲染
+pdfboxAndroid = "2.0.27.0"
 
 splitties = "3.0.0"
 desugar = "2.1.5"
@@ -111,6 +113,7 @@ androidx-junit = { module = "androidx.test.ext:junit", version = "1.2.1" }
 hutool-crypto = { module = "cn.hutool:hutool-crypto", version.ref = "hutool" }
 
 libarchive = { module = "me.zhanghai.android.libarchive:library", version.ref = "libarchive" }
+pdfbox-android = { module = "com.tom-roush:pdfbox-android", version.ref = "pdfboxAndroid" }
 lifecycle-common-java8 = { module = "androidx.lifecycle:lifecycle-common-java8", version.ref = "lifecycle" }
 lifecycle-service = { module = "androidx.lifecycle:lifecycle-service", version.ref = "lifecycle" }
 

@@ -26,6 +26,7 @@ import com.bumptech.glide.request.RequestOptions
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.BookType
+import io.legado.app.constant.IntentAction
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.Theme
 import io.legado.app.data.appDb
@@ -45,6 +46,7 @@ import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isLocalTxt
+import io.legado.app.help.book.isPdf
 import io.legado.app.help.book.isVideo
 import io.legado.app.help.book.isWebFile
 import io.legado.app.help.book.removeType
@@ -65,6 +67,7 @@ import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.model.BookCover
 import io.legado.app.model.remote.RemoteBookWebDav
+import io.legado.app.service.ExportBookService
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.audio.AudioPlayActivity
 import io.legado.app.ui.book.changecover.ChangeCoverDialog
@@ -103,6 +106,7 @@ import io.legado.app.utils.setHtml
 import io.legado.app.utils.setMarkdown
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
+import io.legado.app.utils.startService
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.visible
@@ -276,6 +280,8 @@ class BookInfoActivity :
             viewModel.bookData.value?.isLocalTxt ?: false
         menu.findItem(R.id.menu_upload)?.isVisible =
             viewModel.bookData.value?.isLocal ?: false
+        menu.findItem(R.id.menu_pdf_to_epub)?.isVisible =
+            viewModel.bookData.value?.isPdf ?: false
         menu.findItem(R.id.menu_delete_alert)?.isChecked =
             LocalConfig.bookInfoDeleteAlert
         return super.onMenuOpened(featureId, menu)
@@ -408,8 +414,30 @@ class BookInfoActivity :
                     } ?: upLoadBook(book)
                 }
             }
+
+            R.id.menu_pdf_to_epub -> {
+                viewModel.getBook()?.let { pdfToEpub(it) }
+            }
         }
         return super.onCompatOptionsItemSelected(item)
+    }
+
+    /**
+     * 将当前 PDF 书籍转换为文本版 EPUB（后台进行，完成后自动导入书架）
+     */
+    private fun pdfToEpub(book: Book) {
+        val treeUri = AppConfig.defaultBookTreeUri
+        if (treeUri.isNullOrBlank()) {
+            toastOnUi(R.string.select_book_folder)
+            return
+        }
+        startService<ExportBookService> {
+            action = IntentAction.start
+            putExtra("bookUrl", book.bookUrl)
+            putExtra("exportType", "pdf2epub")
+            putExtra("exportPath", treeUri)
+        }
+        toastOnUi(R.string.pdf_converting)
     }
 
     override fun observeLiveBus() {

@@ -949,6 +949,8 @@
     <string name="book_tree_uri_t">Book Save Location</string>
     <string name="book_tree_uri_s">Save location for books opened from other apps</string>
     <string name="select_book_folder">Select the folder where the books are saved</string>
+    <string name="pdf_to_epub">Convert to EPUB (text)</string>
+    <string name="pdf_converting">Converting to EPUB…</string>
     <string name="user_agent">User agent</string>
     <string name="bg_alpha">Background alpha</string>
 
