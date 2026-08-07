@@ -76,7 +76,7 @@ recyclerview = "1.4.0"
 #noinspection GradleDependency
 viewpager2 = "1.0.0"
 #noinspection GradleDependency
-firebaseBom = "33.2.0"
+firebaseBom = "34.13.0"
 
 [libraries]
 
