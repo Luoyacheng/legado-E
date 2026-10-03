@@ -339,6 +339,7 @@ class BookInfoActivity :
             }
 
             R.id.menu_top -> viewModel.topBook()
+            R.id.menu_bottom -> viewModel.bottomBook()
             R.id.menu_set_source_variable -> setSourceVariable()
             R.id.menu_set_book_variable -> setBookVariable()
             R.id.menu_copy_book_url -> viewModel.getBook()?.let {
@@ -487,6 +488,8 @@ class BookInfoActivity :
         tvAuthor.text = getString(R.string.author_show, book.getRealAuthor())
         tvOrigin.text = getString(R.string.origin_show, book.originName)
         tvLasted.text = getString(R.string.lasted_show, book.latestChapterTitle)
+        tvRating.text = getString(R.string.rating_s, book.rating.toString())
+        tvRemark.text = getString(R.string.remark_s, book.remark)
         showBookIntro(book)
         if (book.isWebFile) {
             llToc.gone()

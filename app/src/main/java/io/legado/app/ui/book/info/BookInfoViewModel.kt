@@ -411,6 +411,17 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
+    fun bottomBook() {
+        execute {
+            bookData.value?.let { book ->
+                val maxOrder = appDb.bookDao.maxOrder
+                book.order = maxOrder + 1
+                book.durChapterTime = System.currentTimeMillis()
+                appDb.bookDao.update(book)
+            }
+        }
+    }
+
     fun saveBook(book: Book?, success: (() -> Unit)? = null) {
         book ?: return
         execute {

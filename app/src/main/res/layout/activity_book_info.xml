@@ -352,6 +352,76 @@
 
                             </LinearLayout>
 
+                            <LinearLayout
+                                android:id="@+id/ll_rating"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal"
+                                android:paddingTop="3dp"
+                                android:paddingBottom="3dp"
+                                tools:ignore="UseCompoundDrawables">
+
+                                <ImageView
+                                    android:layout_width="18sp"
+                                    android:layout_height="18sp"
+                                    android:contentDescription="@string/read_dur_progress"
+                                    android:paddingRight="2dp"
+                                    android:src="@drawable/ic_star_border"
+                                    app:tint="@color/tv_text_summary"
+                                    tools:ignore="RtlHardcoded,RtlSymmetry" />
+
+                                <TextView
+                                    android:id="@+id/tv_rating"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:ellipsize="end"
+                                    android:includeFontPadding="false"
+                                    android:paddingRight="6dp"
+                                    android:singleLine="true"
+                                    android:textColor="@color/tv_text_summary"
+                                    android:textSize="13sp"
+                                    tools:ignore="NestedWeights,RtlHardcoded,RtlSymmetry"
+                                    tools:text="@string/rating_s" />
+
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:id="@+id/ll_remark"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal"
+                                android:paddingTop="3dp"
+                                android:paddingBottom="3dp"
+                                tools:ignore="UseCompoundDrawables">
+
+                                <ImageView
+                                    android:layout_width="18sp"
+                                    android:layout_height="18sp"
+                                    android:contentDescription="@string/read_dur_progress"
+                                    android:paddingRight="2dp"
+                                    android:src="@drawable/ic_edit"
+                                    app:tint="@color/tv_text_summary"
+                                    tools:ignore="RtlHardcoded,RtlSymmetry" />
+
+                                <TextView
+                                    android:id="@+id/tv_remark"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:ellipsize="end"
+                                    android:includeFontPadding="false"
+                                    android:paddingRight="6dp"
+                                    android:singleLine="true"
+                                    android:textColor="@color/tv_text_summary"
+                                    android:textSize="13sp"
+                                    tools:ignore="NestedWeights,RtlHardcoded,RtlSymmetry"
+                                    tools:text="@string/remark_s" />
+
+                            </LinearLayout>
+
                         </LinearLayout>
 
                         <FrameLayout

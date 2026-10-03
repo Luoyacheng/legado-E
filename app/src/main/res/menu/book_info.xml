@@ -41,6 +41,11 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_bottom"
+        android:title="@string/to_bottom"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_set_source_variable"
         android:title="@string/set_source_variable"
         app:showAsAction="never" />

@@ -91,6 +91,21 @@
                     android:entries="@array/book_type"
                     android:theme="@style/Spinner" />
 
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/book_rating"
+                    android:layout_marginLeft="12dp"
+                    android:layout_marginRight="3dp"
+                    tools:ignore="RtlHardcoded" />
+
+                <androidx.appcompat.widget.AppCompatSpinner
+                    android:id="@+id/sp_rating"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:entries="@array/book_rating"
+                    android:theme="@style/Spinner" />
+
             </LinearLayout>
 
             <io.legado.app.ui.widget.text.TextInputLayout
@@ -139,6 +154,19 @@
                     tools:ignore="RtlHardcoded" />
 
             </LinearLayout>
+
+            <io.legado.app.ui.widget.text.TextInputLayout
+                android:id="@+id/til_book_remark"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:hint="@string/book_remark">
+
+                <io.legado.app.lib.theme.view.ThemeEditText
+                    android:id="@+id/tie_book_remark"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </io.legado.app.ui.widget.text.TextInputLayout>
 
             <io.legado.app.ui.widget.text.TextInputLayout
                 android:id="@+id/til_book_jj"

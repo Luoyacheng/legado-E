@@ -586,6 +586,7 @@
     <string name="group">分組</string>
     <string name="group_s">分組：%s</string>
     <string name="toc_s">目錄：%s</string>
+    <string name="rating_s">评分：%s</string>
     <string name="enable_explore">啟用發現</string>
     <string name="disable_explore">禁用發現</string>
     <string name="enable_selection">啟用所選</string>
@@ -617,6 +618,7 @@
     <string name="change_cover_source">封面換源</string>
     <string name="select_local_image">選擇本機圖片</string>
     <string name="book_type">類型：</string>
+    <string name="book_rating">评分：</string>
     <string name="to_backstage">後台</string>
     <string name="importing">正在匯入</string>
     <string name="exporting">正在匯出</string>
@@ -1223,4 +1225,5 @@
     <string name="auto_check_new_backup_t">自动检查新备份</string>
     <string name="auto_check_new_backup_s">打开软件时检查是否有新备份，有新备份时提示是否更新</string>
     <string name="sys_image_picker">系统图片选择器</string>
+    <string name="bookshelf_px_6">按评分</string>
 </resources>

@@ -290,6 +290,71 @@
                                 android:textSize="13sp"
                                 app:radius="2dp" />
                         </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/ll_rating"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingVertical="6dp"
+                            tools:ignore="UseCompoundDrawables">
+
+                            <ImageView
+                                android:layout_width="20sp"
+                                android:layout_height="20sp"
+                                android:contentDescription="@string/read_dur_progress"
+                                android:src="@drawable/ic_star_border"
+                                app:tint="@color/tv_text_summary" />
+
+                            <TextView
+                                android:id="@+id/tv_rating"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:ellipsize="end"
+                                android:includeFontPadding="false"
+                                android:paddingStart="8dp"
+                                android:singleLine="true"
+                                android:textColor="@color/tv_text_summary"
+                                android:textSize="14sp"
+                                tools:ignore="RtlSymmetry"
+                                tools:text="@string/rating_s" />
+
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/ll_remark"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingVertical="6dp"
+                            tools:ignore="UseCompoundDrawables">
+
+                            <ImageView
+                                android:layout_width="20sp"
+                                android:layout_height="20sp"
+                                android:contentDescription="@string/read_dur_progress"
+                                android:src="@drawable/ic_edit"
+                                app:tint="@color/tv_text_summary" />
+
+                            <TextView
+                                android:id="@+id/tv_remark"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:ellipsize="end"
+                                android:includeFontPadding="false"
+                                android:paddingStart="8dp"
+                                android:singleLine="true"
+                                android:textColor="@color/tv_text_summary"
+                                android:textSize="14sp"
+                                tools:ignore="RtlSymmetry"
+                                tools:text="@string/remark_s" />
+
+                        </LinearLayout>
+
                     </LinearLayout>
                 </LinearLayout>
             </io.legado.app.ui.widget.NoChildScrollNestedScrollView>
