@@ -115,6 +115,11 @@ class MoreConfigDialog : BasePrefDialogFragment() {
             key: String?
         ) {
             when (key) {
+                PreferKey.paragraphReadMode,
+                PreferKey.paragraphReadControls,
+                PreferKey.paragraphReadProgress -> {
+                    (activity as? ReadBookActivity)?.updateParagraphMode()
+                }
                 PreferKey.readBodyToLh -> activity?.recreate()
                 PreferKey.hideStatusBar -> {
                     ReadBookConfig.hideStatusBar = getPrefBoolean(PreferKey.hideStatusBar)

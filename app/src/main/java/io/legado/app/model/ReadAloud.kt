@@ -19,7 +19,22 @@ import io.legado.app.utils.startForegroundServiceCompat
 import io.legado.app.utils.toastOnUi
 import splitties.init.appCtx
 
+data class ParagraphTtsStart(
+    val bookUrl: String,
+    val chapterIndex: Int,
+    val itemId: String,
+    val chapterPosition: Int
+)
+
+data class ParagraphTtsStopped(
+    val bookUrl: String,
+    val chapterIndex: Int,
+    val readerSession: Long
+)
+
 object ReadAloud {
+    const val ACTION_PARAGRAPH_PLAY = "paragraphPlay"
+    const val ACTION_PARAGRAPH_CHAPTER = "paragraphChapter"
     private var aloudClass: Class<*> = getReadAloudClass()
     val ttsEngine get() = ReadBook.book?.getTtsEngine() ?: AppConfig.ttsEngine
     var httpTTS: HttpTTS? = null
@@ -75,6 +90,44 @@ object ReadAloud {
             putInt("startPos", startPos)
         }
         postEvent(EventBus.READ_ALOUD_PLAY, bundle)
+    }
+
+    fun playParagraph(
+        context: Context,
+        position: Int,
+        itemId: String? = null,
+        play: Boolean = true
+    ) {
+        val intent = Intent(context, aloudClass).apply {
+            action = ACTION_PARAGRAPH_PLAY
+            putExtra("position", position)
+            putExtra("itemId", itemId)
+            putExtra("play", play)
+        }
+        try {
+            context.startForegroundServiceCompat(intent)
+        } catch (e: Exception) {
+            AppLog.put("启动朗读服务出错\n${e.localizedMessage}", e)
+            context.toastOnUi("启动朗读服务出错\n${e.localizedMessage}")
+        }
+    }
+
+    /** Stop the old chapter and change chapters in the service's main-thread command. */
+    fun changeParagraphChapter(context: Context, next: Boolean) {
+        if (BaseReadAloudService.isRun) {
+            context.startForegroundServiceCompat(Intent(context, aloudClass).apply {
+                action = ACTION_PARAGRAPH_CHAPTER
+                putExtra("next", next)
+            })
+        } else if (next) {
+            ReadBook.moveToNextChapter(true)
+        } else {
+            ReadBook.moveToPrevChapter(true, toLast = false)
+        }
+    }
+
+    fun cancelParagraphChapterPlayback() {
+        BaseReadAloudService.cancelParagraphChapterPlayback()
     }
 
     fun pause(context: Context) {

@@ -62,6 +62,7 @@ import io.legado.app.help.TextViewTagHandler.Companion.HR_PLACE_STR
 import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.paramPattern
 import io.legado.app.ui.book.read.page.entities.column.BaseColumn
 import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
+import io.legado.app.ui.book.read.paragraph.ParagraphItems
 import io.legado.app.ui.book.read.page.provider.ChapterProvider.reviewChar
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
@@ -102,6 +103,7 @@ class TextChapterLayout(
     private val doublePage = ChapterProvider.doublePage
     private val indentCharWidth = ChapterProvider.indentCharWidth
     private val stringBuilder = StringBuilder()
+    private val paragraphItems = ParagraphItems()
 
     private val paragraphIndent = ReadBookConfig.paragraphIndent
     private val titleMode = ReadBookConfig.titleMode
@@ -179,7 +181,6 @@ class TextChapterLayout(
     }
 
     private fun onCompleted() {
-        channel.close()
         try {
             listener?.onLayoutCompleted()
         } catch (e: Exception) {
@@ -187,6 +188,8 @@ class TextChapterLayout(
             AppLog.put("调用布局进度监听回调出错\n${e.localizedMessage}", e)
         } finally {
             listener = null
+            // Consumers of the closed channel must already see the completed chapter.
+            channel.close()
         }
     }
 
@@ -222,7 +225,8 @@ class TextChapterLayout(
         if (titleMode != 2 || bookChapter.isVolume || contents.isEmpty()) {
             var firstLine = true
             //标题非隐藏
-            displayTitle.splitNotBlank("\n").forEach { text ->
+            displayTitle.splitNotBlank("\n").forEachIndexed { index, text ->
+                paragraphItems.beginBlock("title:$index", title = true)
                 val srcList = LinkedList<String>()
                 val clickList = LinkedList<String?>()
                 val titleImg = if (firstLine) {
@@ -326,18 +330,19 @@ class TextChapterLayout(
         val sb = StringBuffer()
         var isSetTypedImage = false
         var wordCount = 0
-        contents.forEach { content ->
+        contents.forEachIndexed { contentIndex, content ->
+            paragraphItems.beginBlock("body:$contentIndex")
             currentCoroutineContext().ensureActive()
             if (adaptSpecialStyle) {
                 val text = content.trim()
                 if (text == "[newpage]") {
                     prepareNextPageIfNeed()
-                    return@forEach
+                    return@forEachIndexed
                 } else if (text.startsWith("<usehtml>")) {
                     val endInt = text.lastIndexOf("<")
                     if (endInt > 9) {
                         setTypeHtml(imageStyle, book, text.substring(9, endInt))
-                        return@forEach
+                        return@forEachIndexed
                     }
                 }
             }
@@ -506,6 +511,11 @@ class TextChapterLayout(
         textPage.text = stringBuilder.toString()
         currentCoroutineContext().ensureActive()
         onPageCompleted()
+        textChapter.paragraphItems = paragraphItems.build(
+            textPages.lastOrNull()?.let { page ->
+                page.lines.firstOrNull()?.chapterPosition?.plus(page.charSize)
+            } ?: 0,
+        )
         onCompleted()
     }
 
@@ -518,7 +528,8 @@ class TextChapterLayout(
         textHeight: Float,
         imageStyle: String?,
         size: Size,
-        click: String?
+        click: String?,
+        htmlSourcePosition: Int? = null,
     ) {
         if (size.width > 0 && size.height > 0) {
             prepareNextPageIfNeed(durY)
@@ -588,6 +599,11 @@ class TextChapterLayout(
                 ImageColumn(start = absStartX + start.toFloat(), end = absStartX + end.toFloat(), src = src, click = click)
             )
             calcTextLinePosition(textPages, textLine, stringBuilder.length)
+            if (htmlSourcePosition != null) {
+                paragraphItems.mapSourceImage(htmlSourcePosition, textLine.chapterPosition, click)
+            } else {
+                recordParagraphLine(textLine)
+            }
             stringBuilder.append(" ") // 确保翻页时索引计算正确
             pendingTextPage.addLine(textLine)
         }
@@ -604,6 +620,7 @@ class TextChapterLayout(
     ) {
         val textViewTagHandler = TextViewTagHandler()
         val spanned = htmlContent.parseAsHtml(HtmlCompat.FROM_HTML_MODE_COMPACT, tagHandler = textViewTagHandler)
+        recordHtmlSource(spanned)
         val width = visibleWidth
         val textPaint = contentPaint
         val textColor = ReadBookConfig.textColor
@@ -645,6 +662,7 @@ class TextChapterLayout(
             textLine.upTopBottom(durY, lineHeight, textPaint.fontMetrics) //y坐标
 
             val columns = mutableListOf<BaseColumn>()
+            val inlineImages = arrayListOf<Pair<Int, ImageColumn>>()
             var charIndex = lineStart
             while (charIndex < lineEnd) {
                 val char = spanned[charIndex].toString()
@@ -701,14 +719,14 @@ class TextChapterLayout(
                         when (iStyle?.uppercase()) {
                             "TEXT" -> {
                                 ImageProvider.cacheImage(book, source, ReadBook.bookSource)
-                                columns.add(
-                                    ImageColumn(
-                                        start = absStartX + charX,
-                                        end = absStartX + charRight,
-                                        src = source,
-                                        click = click
-                                    )
+                                val imageColumn = ImageColumn(
+                                    start = absStartX + charX,
+                                    end = absStartX + charRight,
+                                    src = source,
+                                    click = click,
                                 )
+                                columns.add(imageColumn)
+                                inlineImages.add(charIndex to imageColumn)
                             }
                             else -> {
                                 setTypeImage(
@@ -717,7 +735,8 @@ class TextChapterLayout(
                                     contentPaintTextHeight,
                                     iStyle,
                                     imgSize,
-                                    click
+                                    click,
+                                    htmlSourcePosition = charIndex,
                                 )
                             }
                         }
@@ -729,7 +748,8 @@ class TextChapterLayout(
                             contentPaintTextHeight,
                             imageStyle,
                             imgSize,
-                            null
+                            null,
+                            htmlSourcePosition = charIndex,
                         )
                     }
                     needAddText = false
@@ -774,6 +794,13 @@ class TextChapterLayout(
                 textLine.addColumns(columns)
             }
             calcTextLinePosition(textPages, textLine, stringBuilder.length)
+            paragraphItems.mapSourceLine(lineStart, lineEnd, textLine.chapterPosition)
+            inlineImages.forEach { (sourcePosition, imageColumn) ->
+                paragraphItems.mapSourceImage(
+                    sourcePosition, textLine.chapterPosition + sourcePosition - lineStart,
+                    imageColumn.click,
+                )
+            }
             stringBuilder.append(lineText)
             val textPage = pendingTextPage
             textPage.addLine(textLine)
@@ -1014,6 +1041,7 @@ class TextChapterLayout(
                 textLine.isLeftLine = absStartX < viewWidth / 2
             }
             calcTextLinePosition(textPages, textLine, stringBuilder.length)
+            recordParagraphLine(textLine)
             stringBuilder.append(lineText)
             textLine.upTopBottom(durY, textHeight, fontMetrics)
             val textPage = pendingTextPage
@@ -1024,6 +1052,55 @@ class TextChapterLayout(
             }
         }
         durY += textHeight * paragraphSpacing / 10f
+    }
+
+    private fun recordParagraphLine(line: TextLine) {
+        var position = line.chapterPosition
+        var textStart = position
+        val text = StringBuilder()
+        fun flushText() {
+            paragraphItems.appendText(text.toString(), textStart)
+            text.setLength(0)
+        }
+        for (column in line.columns) {
+            when (column) {
+                is TextBaseColumn -> {
+                    text.append(column.charData)
+                    position += column.charData.length
+                }
+                is ImageColumn -> {
+                    flushText()
+                    paragraphItems.appendImage(column.src, column.click, position)
+                    position++
+                    textStart = position
+                }
+            }
+        }
+        flushText()
+    }
+
+    private fun recordHtmlSource(spanned: Spanned) {
+        var textStart = 0
+        var position = 0
+        while (position < spanned.length) {
+            val image = spanned.getSpans(position, position + 1, ImageSpan::class.java)
+                .firstOrNull { it.source != null }
+            if (image != null) {
+                paragraphItems.addSourceText(textStart, position, spanned.subSequence(textStart, position))
+                val imageEnd = spanned.getSpanEnd(image).coerceAtLeast(position + 1)
+                    .coerceAtMost(spanned.length)
+                paragraphItems.addSourceImage(position, imageEnd, image.source!!)
+                position = imageEnd
+                textStart = position
+            } else if (spanned[position] == '\n') {
+                paragraphItems.addSourceText(textStart, position, spanned.subSequence(textStart, position))
+                position++
+                textStart = position
+            } else {
+                position++
+            }
+        }
+        paragraphItems.addSourceText(textStart, position, spanned.subSequence(textStart, position))
     }
 
     private fun calcTextLinePosition(

@@ -27,6 +27,9 @@ import java.net.InetAddress
 
 @Suppress("MemberVisibilityCanBePrivate", "ConstPropertyName")
 object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
+    val paragraphReadMode get() = appCtx.getPrefBoolean(PreferKey.paragraphReadMode, false)
+    val paragraphReadControls get() = appCtx.getPrefBoolean(PreferKey.paragraphReadControls, true)
+    val paragraphReadProgress get() = appCtx.getPrefBoolean(PreferKey.paragraphReadProgress, true)
     val isCronet = appCtx.getPrefBoolean(PreferKey.cronet)
     var useAntiAlias = appCtx.getPrefBoolean(PreferKey.antiAlias)
     var userAgent: String = getPrefUserAgent()

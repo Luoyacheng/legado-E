@@ -61,6 +61,8 @@ import kotlin.math.min
 object ReadBook : CoroutineScope by MainScope() {
     var book: Book? = null
     var callBack: CallBack? = null
+    /** Nonzero only while the paragraph reader is resumed; scopes TTS stop events to that view. */
+    @Volatile var paragraphReaderVisibleSession = 0L
     var inBookshelf = false
     var chapterSize = 0
     var simulatedChapterSize = 0
@@ -333,6 +335,7 @@ object ReadBook : CoroutineScope by MainScope() {
 
     fun moveToNextChapter(upContent: Boolean, upContentInPlace: Boolean = true): Boolean {
         if (durChapterIndex < simulatedChapterSize - 1) {
+            if (AppConfig.paragraphReadMode) ReadAloud.cancelParagraphChapterPlayback()
             durChapterPos = 0
             durChapterIndex++
             clearExpiredChapterLoadingJob()
@@ -364,6 +367,7 @@ object ReadBook : CoroutineScope by MainScope() {
         upContentInPlace: Boolean = true
     ): Boolean {
         if (durChapterIndex < simulatedChapterSize - 1) {
+            if (AppConfig.paragraphReadMode) ReadAloud.cancelParagraphChapterPlayback()
             durChapterPos = 0
             durChapterIndex++
             clearExpiredChapterLoadingJob()
@@ -396,6 +400,7 @@ object ReadBook : CoroutineScope by MainScope() {
         upContentInPlace: Boolean = true
     ): Boolean {
         if (durChapterIndex > 0) {
+            if (AppConfig.paragraphReadMode) ReadAloud.cancelParagraphChapterPlayback()
             durChapterPos = if (toLast) prevTextChapter?.lastReadLength ?: Int.MAX_VALUE else 0
             durChapterIndex--
             clearExpiredChapterLoadingJob()
@@ -456,6 +461,7 @@ object ReadBook : CoroutineScope by MainScope() {
         success: (() -> Unit)? = null
     ) {
         if (index < chapterSize) {
+            if (AppConfig.paragraphReadMode) ReadAloud.cancelParagraphChapterPlayback()
             clearTextChapter()
             if (upContent) callBack?.upContent()
             durChapterIndex = index
@@ -474,7 +480,7 @@ object ReadBook : CoroutineScope by MainScope() {
         callBack?.pageChanged()
         curTextChapter?.let {
             if (BaseReadAloudService.isRun && it.isCompleted) {
-                val scrollPageAnim = pageAnim() == 3
+                val scrollPageAnim = !AppConfig.paragraphReadMode && pageAnim() == 3
                 if (scrollPageAnim && pageChanged) {
                     ReadAloud.pause(appCtx)
                 } else {
@@ -493,7 +499,11 @@ object ReadBook : CoroutineScope by MainScope() {
         book ?: return
         val textChapter = curTextChapter ?: return
         if (textChapter.isCompleted) {
-            ReadAloud.play(appCtx, play, startPos = startPos)
+            if (AppConfig.paragraphReadMode) {
+                ReadAloud.playParagraph(appCtx, durChapterPos, play = play)
+            } else {
+                ReadAloud.play(appCtx, play, startPos = startPos)
+            }
         }
     }
 
@@ -907,22 +917,31 @@ object ReadBook : CoroutineScope by MainScope() {
 
     fun saveRead(pageChanged: Boolean = false) {
         val book = book ?: return
+        val sourceAtSave = bookSource
+        val spokenProgress = if (AppConfig.paragraphReadMode && BaseReadAloudService.isRun) {
+            BaseReadAloudService.currentParagraphProgress()?.takeIf {
+                it.bookUrl == book.bookUrl && it.chapterIndex == durChapterIndex
+            }
+        } else null
+        val chapterIndex = spokenProgress?.chapterIndex ?: durChapterIndex
+        val chapterPos = spokenProgress?.chapterPosition ?: durChapterPos
+        spokenProgress?.anchor?.let { book.config.paragraphAnchor = it }
+        val durTime = System.currentTimeMillis()
         executor.execute {
             kotlin.runCatching {
                 book.lastCheckCount = 0
-                val durTime = System.currentTimeMillis()
                 book.durChapterTime = durTime
-                val chapterChanged = book.durChapterIndex != durChapterIndex
-                book.durChapterIndex = durChapterIndex
-                book.durChapterPos = durChapterPos
+                val chapterChanged = book.durChapterIndex != chapterIndex
+                book.durChapterIndex = chapterIndex
+                book.durChapterPos = chapterPos
                 if (!pageChanged || chapterChanged) {
-                    appDb.bookChapterDao.getChapter(book.bookUrl, durChapterIndex)?.let {
+                    appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)?.let {
                         book.durChapterTitle = it.getDisplayTitle(
                             ContentProcessor.get(book.name, book.origin).getTitleReplaceRules(),
                             book.getUseReplaceRule(),
                             replaceBook = book.toReplaceBook()
                         )
-                        SourceCallBack.callBackBook(SourceCallBack.SAVE_READ, bookSource, book, it, durTime.toString())
+                        SourceCallBack.callBackBook(SourceCallBack.SAVE_READ, sourceAtSave, book, it, durTime.toString())
                     }
                 }
                 book.update()

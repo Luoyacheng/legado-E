@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="paragraph_read_mode">Paragraph reading mode</string>
+    <string name="paragraph_read_mode_summary">Read complete paragraphs and images as separate screen reader items. Applies to all books.</string>
+    <string name="paragraph_read_controls">Show paragraph reading controls</string>
+    <string name="paragraph_read_progress">Show paragraph reading progress</string>
+    <string name="paragraph_play">Play</string>
+    <string name="paragraph_image">Image %1$d</string>
+    <string name="paragraph_read_menu">Reading menu</string>
     <!--App-->
     <string name="app_name">Legado</string>
     <string name="app_name_a">Legado·A</string>

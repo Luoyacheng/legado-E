@@ -9,6 +9,12 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <io.legado.app.ui.book.read.paragraph.ParagraphReadView
+        android:id="@+id/paragraph_read_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
     <View
         android:id="@+id/text_menu_position"
         android:layout_width="0dp"
