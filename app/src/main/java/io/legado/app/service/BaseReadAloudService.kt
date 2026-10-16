@@ -34,6 +34,7 @@ import io.legado.app.constant.IntentAction
 import io.legado.app.constant.NotificationId
 import io.legado.app.constant.PreferKey
 import io.legado.app.constant.Status
+import io.legado.app.data.entities.Book
 import io.legado.app.help.MediaHelp
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
@@ -41,10 +42,13 @@ import io.legado.app.help.glide.ImageLoader
 import io.legado.app.lib.permission.Permissions
 import io.legado.app.lib.permission.PermissionsCompat
 import io.legado.app.model.ReadAloud
+import io.legado.app.model.ParagraphTtsStart
+import io.legado.app.model.ParagraphTtsStopped
 import io.legado.app.model.ReadBook
 import io.legado.app.receiver.MediaButtonReceiver
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.book.read.page.entities.TextChapter
+import io.legado.app.ui.book.read.paragraph.ParagraphPosition
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.activityPendingIntent
 import io.legado.app.utils.broadcastPendingIntent
@@ -72,7 +76,31 @@ import splitties.systemservices.wifiManager
 abstract class BaseReadAloudService : BaseService(),
     AudioManager.OnAudioFocusChangeListener {
 
+    data class ParagraphProgress(
+        val bookUrl: String,
+        val chapterIndex: Int,
+        val chapterPosition: Int,
+        val anchor: Book.ParagraphAnchor
+    )
+
     companion object {
+        @Volatile private var currentService: BaseReadAloudService? = null
+
+        fun currentParagraphProgress(): ParagraphProgress? {
+            val service = currentService ?: return null
+            return if (isRun && service.paragraphMode) service.lastStartedParagraphProgress else null
+        }
+
+        fun cancelParagraphChapterPlayback() {
+            val service = currentService ?: return
+            service.lifecycleScope.launch(Main.immediate) {
+                if (currentService === service && service.paragraphMode) {
+                    service.lastStartedParagraphProgress = null
+                    service.invalidateParagraphPlayback()
+                }
+            }
+        }
+        @Volatile
         @JvmStatic
         var isRun = false
             private set
@@ -134,6 +162,121 @@ abstract class BaseReadAloudService : BaseService(),
     var readAloudByPage = false
         private set
 
+    internal var paragraphMode = false
+        private set
+    internal var paragraphSession = 0L
+        private set
+    internal var paragraphSpeechItems = emptyList<ParagraphSpeechItem>()
+        private set
+    internal var paragraphWaitingForChapter = false
+        private set
+    private var paragraphBookUrl = ""
+    private var paragraphChapterIndex = -1
+    private var announcedParagraphId: String? = null
+    @Volatile private var lastStartedParagraphProgress: ParagraphProgress? = null
+    protected open val paragraphSpeechLimit: Int get() = Int.MAX_VALUE
+
+    /** Invalidate callbacks before cancelling audio, which may itself produce callbacks. */
+    private fun invalidateParagraphPlayback() {
+        paragraphSession++
+        paragraphWaitingForChapter = true
+        paragraphSpeechItems = emptyList()
+        contentList = emptyList()
+        playStop()
+    }
+
+    internal fun paragraphUtteranceId(index: Int): String =
+        "paragraph:$paragraphSession:$index"
+
+    internal fun paragraphIndex(id: String?): Int? {
+        val parts = id?.split(':') ?: return null
+        if (parts.size != 3 || parts[0] != "paragraph" || !paragraphMode
+            || pause || paragraphWaitingForChapter
+            || parts[1].toLongOrNull() != paragraphSession
+            || ReadBook.book?.bookUrl != paragraphBookUrl
+            || ReadBook.durChapterIndex != paragraphChapterIndex
+        ) return null
+        return parts[2].toIntOrNull()?.takeIf { it in paragraphSpeechItems.indices }
+    }
+
+    internal fun paragraphStarted(index: Int) {
+        val speech = paragraphSpeechItems.getOrNull(index) ?: return
+        nowSpeak = index
+        readAloudNumber = speech.item.canonicalPositionAt(speech.textStart)
+        if (announcedParagraphId == speech.item.id) return
+        val chapterUrl = textChapter?.chapter?.url ?: return
+        val book = ReadBook.book?.takeIf { it.bookUrl == paragraphBookUrl } ?: return
+        val anchor = Book.ParagraphAnchor(
+            chapterUrl, speech.item.id, speech.item.chapterPosition
+        )
+        announcedParagraphId = speech.item.id
+        lastStartedParagraphProgress = ParagraphProgress(
+            paragraphBookUrl, paragraphChapterIndex, speech.item.chapterPosition, anchor
+        )
+        ReadBook.durChapterPos = speech.item.chapterPosition
+        book.config.paragraphAnchor = anchor
+        ReadBook.saveRead(true)
+        postEvent(EventBus.PARAGRAPH_TTS_START, ParagraphTtsStart(
+            paragraphBookUrl, paragraphChapterIndex, speech.item.id, speech.item.chapterPosition
+        ))
+    }
+
+    internal fun restartParagraphSession() {
+        paragraphSession++
+        announcedParagraphId = null
+    }
+
+    internal fun paragraphFinished(index: Int) {
+        if (index != nowSpeak) return
+        paragraphStartPos = 0
+        if (index == paragraphSpeechItems.lastIndex) {
+            nextChapter()
+        } else {
+            nowSpeak = index + 1
+            val next = paragraphSpeechItems[nowSpeak]
+            readAloudNumber = next.item.canonicalPositionAt(next.textStart)
+        }
+    }
+
+    private fun newParagraphReadAloud(play: Boolean, position: Int, itemId: String?) {
+        val chapter = ReadBook.curTextChapter?.takeIf { it.isCompleted } ?: return
+        val wasParagraphMode = paragraphMode
+        paragraphSession++
+        paragraphMode = true
+        playStop()
+        paragraphWaitingForChapter = false
+        paragraphBookUrl = ReadBook.book?.bookUrl ?: return
+        if (!wasParagraphMode || lastStartedParagraphProgress?.bookUrl != paragraphBookUrl) {
+            lastStartedParagraphProgress = null
+        }
+        paragraphChapterIndex = ReadBook.durChapterIndex
+        textChapter = chapter
+        readAloudByPage = false
+        announcedParagraphId = null
+        val items = chapter.paragraphItems
+        val startIndex = items.indexOfFirst { it.id == itemId }.takeIf { it >= 0 }
+            ?: ParagraphPosition.findItemIndex(items, position).coerceAtLeast(0)
+        paragraphSpeechItems = ParagraphSpeechQueue.build(items, paragraphSpeechLimit)
+        contentList = paragraphSpeechItems.map { it.text }
+        nowSpeak = paragraphSpeechItems.indexOfFirst { speech ->
+            items.indexOfFirst { it.id == speech.item.id } >= startIndex
+        }
+        if (nowSpeak < 0) nowSpeak = paragraphSpeechItems.size
+        paragraphStartPos = 0
+        readAloudNumber = paragraphSpeechItems.getOrNull(nowSpeak)?.let {
+            it.item.canonicalPositionAt(it.textStart)
+        } ?: position
+        if (play) {
+            resumeReadAloudInternal()
+            if (nowSpeak >= contentList.size) {
+                nextChapter()
+            } else play()
+        } else {
+            pageChanged = true
+            pauseReadAloud()
+        }
+    }
+
     private val broadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (AudioManager.ACTION_AUDIO_BECOMING_NOISY == intent.action) {
@@ -145,6 +288,7 @@ abstract class BaseReadAloudService : BaseService(),
     @SuppressLint("WakelockTimeout")
     override fun onCreate() {
         super.onCreate()
+        currentService = this
         isRun = true
         pause = false
         observeLiveBus()
@@ -187,6 +331,8 @@ abstract class BaseReadAloudService : BaseService(),
     }
 
     override fun onDestroy() {
+        paragraphSession++
+        if (currentService === this) currentService = null
         super.onDestroy()
         if (useWakeLock) {
             wakeLock.release()
@@ -196,7 +342,24 @@ abstract class BaseReadAloudService : BaseService(),
         pause = true
         abandonFocus()
         unregisterReceiver(broadcastReceiver)
+        if (paragraphMode && ReadBook.paragraphReaderVisibleSession == 0L) {
+            val progress = lastStartedParagraphProgress
+            val book = ReadBook.book
+            if (progress != null && book?.bookUrl == progress.bookUrl
+                && progress.chapterIndex == ReadBook.durChapterIndex
+            ) {
+                ReadBook.durChapterIndex = progress.chapterIndex
+                ReadBook.durChapterPos = progress.chapterPosition
+                book.config.paragraphAnchor = progress.anchor
+                ReadBook.saveRead(true)
+            }
+        }
         postEvent(EventBus.ALOUD_STATE, Status.STOP)
+        if (paragraphMode) {
+            postEvent(EventBus.PARAGRAPH_TTS_STOP, ParagraphTtsStopped(
+                paragraphBookUrl, paragraphChapterIndex, ReadBook.paragraphReaderVisibleSession
+            ))
+        }
         notificationManager.cancel(NotificationId.ReadAloudService)
         upMediaSessionPlaybackState(PlaybackStateCompat.STATE_STOPPED)
         mediaSessionCompat.release()
@@ -209,6 +372,14 @@ abstract class BaseReadAloudService : BaseService(),
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
+            ReadAloud.ACTION_PARAGRAPH_PLAY -> newParagraphReadAloud(
+                intent.getBooleanExtra("play", true),
+                intent.getIntExtra("position", ReadBook.durChapterPos),
+                intent.getStringExtra("itemId")
+            )
+            ReadAloud.ACTION_PARAGRAPH_CHAPTER -> changeParagraphChapter(
+                intent.getBooleanExtra("next", true)
+            )
             IntentAction.play -> newReadAloud(
                 intent.getBooleanExtra("play", true),
                 intent.getIntExtra("pageIndex", ReadBook.durPageIndex),
@@ -230,6 +401,12 @@ abstract class BaseReadAloudService : BaseService(),
     }
 
     private fun newReadAloud(play: Boolean, pageIndex: Int, startPos: Int) {
+        if (AppConfig.paragraphReadMode) {
+            newParagraphReadAloud(play, ReadBook.durChapterPos, null)
+            return
+        }
+        paragraphMode = false
+        lastStartedParagraphProgress = null
         execute(executeContext = IO) {
             this@BaseReadAloudService.pageIndex = pageIndex
             textChapter = ReadBook.curTextChapter
@@ -330,6 +507,10 @@ abstract class BaseReadAloudService : BaseService(),
     }
 
     private fun prevP() {
+        if (paragraphMode) {
+            seekParagraphItem(false)
+            return
+        }
         if (nowSpeak > 0) {
             playStop()
             do {
@@ -356,6 +537,10 @@ abstract class BaseReadAloudService : BaseService(),
     }
 
     private fun nextP() {
+        if (paragraphMode) {
+            seekParagraphItem(true)
+            return
+        }
         if (nowSpeak < contentList.size - 1) {
             playStop()
             readAloudNumber += contentList[nowSpeak].length.plus(1) - paragraphStartPos
@@ -689,18 +874,69 @@ abstract class BaseReadAloudService : BaseService(),
     abstract fun aloudServicePendingIntent(actionStr: String): PendingIntent?
 
     open fun prevChapter() {
+        if (paragraphMode) {
+            changeParagraphChapter(false)
+            return
+        }
         toLast = false
         resumeReadAloudInternal()
         ReadBook.moveToPrevChapter(true, toLast = false)
     }
 
     open fun nextChapter() {
+        if (paragraphMode) {
+            ReadBook.upReadTime()
+            val lastChapterIndex = minOf(ReadBook.chapterSize, ReadBook.simulatedChapterSize) - 1
+            if (ReadBook.durChapterIndex >= lastChapterIndex) {
+                invalidateParagraphPlayback()
+                stopSelf()
+            } else {
+                changeParagraphChapter(true)
+            }
+            return
+        }
         ReadBook.upReadTime()
         AppLog.putDebug("${ReadBook.curTextChapter?.chapter?.title} 朗读结束跳转下一章并朗读")
         resumeReadAloudInternal()
         if (!ReadBook.moveToNextChapter(true)) {
             stopSelf()
         }
+    }
+
+    private fun changeParagraphChapter(next: Boolean) {
+        val canChange = if (next) {
+            ReadBook.durChapterIndex < minOf(ReadBook.chapterSize, ReadBook.simulatedChapterSize) - 1
+        } else {
+            ReadBook.durChapterIndex > 0
+        }
+        if (!canChange) return
+        lastStartedParagraphProgress = null
+        ReadBook.book?.takeIf { it.bookUrl == paragraphBookUrl }
+            ?.config?.paragraphAnchor = null
+        invalidateParagraphPlayback()
+        if (next) ReadBook.moveToNextChapter(true)
+        else ReadBook.moveToPrevChapter(true, toLast = false)
+    }
+
+    private fun seekParagraphItem(next: Boolean) {
+        val currentId = paragraphSpeechItems.getOrNull(nowSpeak)?.item?.id ?: return
+        val index = if (next) (nowSpeak + 1..paragraphSpeechItems.lastIndex).firstOrNull {
+            paragraphSpeechItems[it].item.id != currentId
+        } ?: -1
+        else (nowSpeak - 1 downTo 0).firstOrNull {
+            paragraphSpeechItems[it].item.id != currentId
+        } ?: -1
+        if (index < 0) {
+            changeParagraphChapter(next)
+            return
+        }
+        val id = paragraphSpeechItems[index].item.id
+        nowSpeak = paragraphSpeechItems.indexOfFirst { it.item.id == id }
+        paragraphSession++
+        playStop()
+        paragraphStartPos = 0
+        announcedParagraphId = null
+        play()
     }
 
     private fun initPhoneStateListener() {

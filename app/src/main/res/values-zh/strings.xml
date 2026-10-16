@@ -1,4 +1,11 @@
 <resources>
+    <string name="paragraph_read_mode">段落阅读模式</string>
+    <string name="paragraph_read_mode_summary">每段正文和图片作为独立的读屏焦点，对所有书籍生效</string>
+    <string name="paragraph_read_controls">显示段落阅读控制按钮</string>
+    <string name="paragraph_read_progress">显示段落阅读进度</string>
+    <string name="paragraph_play">播放</string>
+    <string name="paragraph_image">图片，第 %1$d 张</string>
+    <string name="paragraph_read_menu">阅读菜单</string>
     <!--App-->
     <string name="app_name">阅读</string>
     <string name="app_name_a">阅读·A</string>

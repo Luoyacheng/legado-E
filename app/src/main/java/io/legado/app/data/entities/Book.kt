@@ -450,6 +450,13 @@ data class Book(
     }
 
     @Parcelize
+    data class ParagraphAnchor(
+        val chapterUrl: String,
+        val itemId: String,
+        val chapterPosition: Int
+    ) : Parcelable
+
+    @Parcelize
     data class ReadConfig(
         var reverseToc: Boolean = false,
         var pageAnim: Int? = null,
@@ -466,7 +473,8 @@ data class Book(
         var openCredits: Int = 0,       //音频片头
         var closeCredits: Int = 0,       //音频片尾
         var playMode: Int = 0,           //音频播放模式
-        var playSpeed: Float = 1.0f      //音频播放速度
+        var playSpeed: Float = 1.0f,     //音频播放速度
+        var paragraphAnchor: ParagraphAnchor? = null
     ) : Parcelable
 
     class Converters {
