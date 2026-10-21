@@ -619,6 +619,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefInt(PreferKey.pageTouchClick, value)
         }
 
+    var einkFullRefreshInterval: Int
+        get() = appCtx.getPrefInt(PreferKey.einkFullRefreshInterval, 0)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.einkFullRefreshInterval, value)
+        }
+
     var bookshelfSort: Int
         get() = appCtx.getPrefInt(PreferKey.bookshelfSort, 0)
         set(value) {

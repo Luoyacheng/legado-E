@@ -149,6 +149,7 @@ object PreferKey {
     const val sourceEditMaxLine = "sourceEditMaxLine"
     const val ttsTimer = "ttsTimer"
     const val noAnimScrollPage = "noAnimScrollPage"
+    const val einkFullRefreshInterval = "einkFullRefreshInterval"
     const val webDavDeviceName = "webDavDeviceName"
     const val webServiceWakeLock = "webServiceWakeLock"
     const val audioPlayWakeLock = "audioPlayWakeLock"

@@ -196,6 +196,18 @@ class MoreConfigDialog : BasePrefDialogFragment() {
                         }
                 }
 
+                PreferKey.einkFullRefreshInterval -> {
+                    NumberPickerDialog(requireContext())
+                        .setTitle(getString(R.string.eink_full_refresh_dialog_title))
+                        .setMaxValue(99)
+                        .setMinValue(0)
+                        .setValue(AppConfig.einkFullRefreshInterval)
+                        .show {
+                            AppConfig.einkFullRefreshInterval = it
+                            upPreferenceSummary(PreferKey.einkFullRefreshInterval, if (it == 0) getString(R.string.eink_full_refresh_summary) else it.toString())
+                        }
+                }
+
                 PreferKey.pageTouchClick -> {
                     NumberPickerDialog(requireContext())
                         .setTitle(getString(R.string.page_touch_click_dialog_title))

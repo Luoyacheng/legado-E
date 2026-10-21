@@ -1022,6 +1022,9 @@
     <string name="page_touch_slop_title">滑動翻頁閾值</string>
     <string name="page_touch_slop_dialog_title">滑動翻頁閾值（0 = 系統預設值）</string>
     <string name="page_touch_slop_summary">滑動多長距離才會觸發滑動翻頁（系統預設值 %s px）</string>
+    <string name="eink_full_refresh_title">墨水屏全刷頻率</string>
+    <string name="eink_full_refresh_summary">每幾頁全刷一次清除殘影（0 = 關閉）</string>
+    <string name="eink_full_refresh_dialog_title">墨水屏全刷頻率（0 = 關閉）</string>
     <string name="example">範例</string>
     <string name="check_selected_interval">選中所選區間</string>
     <string name="show_add_to_shelf_alert_title">返回時提示放入書架</string>

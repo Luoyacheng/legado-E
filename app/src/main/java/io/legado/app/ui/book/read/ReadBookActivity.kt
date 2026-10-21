@@ -1067,6 +1067,7 @@ class ReadBookActivity : BaseReadBookActivity(),
      */
     override fun pageChanged() {
         pageChanged = true
+        io.legado.app.utils.eink.EinkRefresher.onPageTurned(AppConfig.einkFullRefreshInterval)
         binding.readView.onPageChange()
         handler.post {
             upSeekBarProgress()

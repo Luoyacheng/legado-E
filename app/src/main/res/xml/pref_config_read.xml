@@ -123,6 +123,13 @@
         app:isBottomBackground="true" />
 
     <io.legado.app.lib.prefs.Preference
+        android:key="einkFullRefreshInterval"
+        android:summary="@string/eink_full_refresh_summary"
+        android:title="@string/eink_full_refresh_title"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.Preference
         android:key="pageTouchSlop"
         android:summary="@string/page_touch_slop_summary"
         android:title="@string/page_touch_slop_title"

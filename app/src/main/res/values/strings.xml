@@ -1035,6 +1035,9 @@
     <string name="page_touch_slop_title">Sliding Page Threshold</string>
     <string name="page_touch_slop_dialog_title">Sliding page turn threshold (0 = system default)</string>
     <string name="page_touch_slop_summary">How far to slide to trigger a page slide (system default %s px)</string>
+    <string name="eink_full_refresh_title">E-Ink full refresh</string>
+    <string name="eink_full_refresh_summary">Full refresh every N pages to clear ghosting (0 = off)</string>
+    <string name="eink_full_refresh_dialog_title">E-Ink full refresh interval (0 = off)</string>
     <string name="page_touch_click_title">边缘点击阈值</string>
     <string name="page_touch_click_summary">左右边缘多少距离不会触发点击事件，默认为0px</string>
     <string name="page_touch_click_dialog_title">边缘点击阈值</string>
