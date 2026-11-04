@@ -8,7 +8,12 @@ import android.util.Size
 import java.io.FileInputStream
 import java.io.InputStream
 import com.caverock.androidsvg.SVG
-import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
+
+private const val MAX_SVG_BITMAP_DIMENSION = 4096
+private const val MAX_SVG_BITMAP_PIXELS = 4_194_304L
 
 @Suppress("WeakerAccess", "MemberVisibilityCanBePrivate")
 object SvgUtils {
@@ -58,15 +63,6 @@ object SvgUtils {
     /////// private method
     private fun createBitmap(svg: SVG, width: Int? = null, height: Int? = null): Bitmap {
         val size = getSize(svg)
-        val wRatio = width?.let { size.width / it } ?: -1
-        val hRatio = height?.let { size.height / it } ?: -1
-        //如果超出指定大小，则缩小相应的比例
-        val ratio = when {
-            wRatio > 1 && hRatio > 1 -> max(wRatio, hRatio)
-            wRatio > 1 -> wRatio
-            hRatio > 1 -> hRatio
-            else -> 1
-        }
 
         val viewBox: RectF? = svg.documentViewBox
         if (viewBox == null && size.width > 0 && size.height > 0) {
@@ -76,12 +72,47 @@ object SvgUtils {
         svg.setDocumentWidth("100%")
         svg.setDocumentHeight("100%")
 
-        val bitmapWidth = size.width / ratio
-        val bitmapHeight = size.height / ratio
+        val (bitmapWidth, bitmapHeight) = calculateSvgBitmapSize(
+            size.width,
+            size.height,
+            width,
+            height,
+        )
         val bitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
 
         svg.renderToCanvas(Canvas(bitmap))
         return bitmap
+    }
+
+    private fun calculateSvgBitmapSize(
+        sourceWidth: Int,
+        sourceHeight: Int,
+        targetWidth: Int? = null,
+        targetHeight: Int? = null,
+    ): Pair<Int, Int> {
+        require(sourceWidth > 0 && sourceHeight > 0)
+        require(targetWidth == null || targetWidth > 0)
+        require(targetHeight == null || targetHeight > 0)
+        val widthScale = targetWidth?.let { it.toFloat() / sourceWidth }
+        val heightScale = targetHeight?.let { it.toFloat() / sourceHeight }
+        val requestedScale = when {
+            widthScale != null && heightScale != null -> min(widthScale, heightScale)
+            widthScale != null -> widthScale
+            heightScale != null -> heightScale
+            else -> 1f
+        }
+        val dimensionScale = min(
+            MAX_SVG_BITMAP_DIMENSION.toFloat() / sourceWidth,
+            MAX_SVG_BITMAP_DIMENSION.toFloat() / sourceHeight,
+        )
+        val pixelScale = sqrt(
+            MAX_SVG_BITMAP_PIXELS.toDouble() / (sourceWidth.toLong() * sourceHeight).toDouble()
+        ).toFloat()
+        val scale = min(requestedScale, min(dimensionScale, pixelScale))
+        return Pair(
+            (sourceWidth * scale).roundToInt().coerceAtLeast(1),
+            (sourceHeight * scale).roundToInt().coerceAtLeast(1),
+        )
     }
 
     private fun getSize(svg: SVG): Size {
